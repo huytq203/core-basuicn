@@ -6,9 +6,9 @@ import readline from 'readline';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const VERSION = '0.3.19';
+const VERSION = '0.4.0';
 const REGISTRY_LOCAL = './registry.json';
-const REGISTRY_REMOTE = 'https://raw.githubusercontent.com/Basuicn/basuicn-core/main/registry.json';
+const REGISTRY_REMOTE = 'https://raw.githubusercontent.com/huytq203/core-basuicn/main/registry.json';
 
 // ─── Colors (ANSI) ───────────────────────────────────────────────────────────
 
@@ -834,6 +834,103 @@ const removeComponent = (
     removeFromComponentIndex(component.files as RegistryFile[], cwd);
 };
 
+// ─── Bulk update ──────────────────────────────────────────────────────────────
+
+const withUseClient = (file: RegistryFile, framework: Framework): string => {
+    if (framework === 'nextjs-app' && file.path.endsWith('.tsx')
+        && !file.content.startsWith("'use client'") && !file.content.startsWith('"use client"')) {
+        return "'use client';\n" + file.content;
+    }
+    return file.content;
+};
+
+interface PendingChange { file: RegistryFile; content: string; isNew: boolean }
+
+/** Components with at least one file present locally are considered installed. */
+const findInstalledComponents = (registry: Registry, cwd: string): string[] =>
+    Object.keys(registry.components).filter((name) =>
+        registry.components[name].files.some((f) => fs.existsSync(path.join(cwd, f.path)))
+    );
+
+const collectChanges = (files: RegistryFile[], cwd: string, framework: Framework): PendingChange[] => {
+    const changes: PendingChange[] = [];
+    for (const file of files) {
+        const targetPath = path.join(cwd, file.path);
+        const content = withUseClient(file, framework);
+        const exists = fs.existsSync(targetPath);
+        if (exists && fs.readFileSync(targetPath, 'utf-8') === content) continue;
+        changes.push({ file, content, isNew: !exists });
+    }
+    return changes;
+};
+
+const updateAllComponents = async (
+    registry: Registry,
+    cwd: string,
+    options: { yes: boolean; dryRun: boolean; includeCore: boolean }
+) => {
+    const framework = detectFramework(cwd);
+    const installed = findInstalledComponents(registry, cwd);
+    if (installed.length === 0) {
+        warn(`No installed components found. Run ${c.cyan}npx basuicn add <name>${c.reset} first.`);
+        return;
+    }
+
+    const plan = new Map<string, PendingChange[]>();
+    for (const name of installed) {
+        const changes = collectChanges(registry.components[name].files, cwd, framework);
+        if (changes.length > 0) plan.set(name, changes);
+    }
+    const coreChanges = options.includeCore && registry.core
+        ? collectChanges(registry.core.files, cwd, framework)
+        : [];
+
+    if (plan.size === 0 && coreChanges.length === 0) {
+        ok(`All ${installed.length} installed component(s) are already up to date.`);
+        return;
+    }
+
+    console.log(`\n${c.bold}${plan.size} of ${installed.length} installed component(s) have updates:${c.reset}`);
+    for (const [name, changes] of plan) {
+        console.log(`  ${c.yellow}~${c.reset} ${name} ${c.dim}(${changes.length} file${changes.length > 1 ? 's' : ''})${c.reset}`);
+    }
+    if (coreChanges.length > 0) {
+        console.log(`  ${c.yellow}~${c.reset} core ${c.dim}(${coreChanges.map((x) => x.file.path).join(', ')})${c.reset}`);
+    }
+    console.log(`\n${c.yellow}⚠${c.reset} Local edits in these files will be overwritten. Run ${c.cyan}basuicn diff <name>${c.reset} to review first.\n`);
+
+    if (options.dryRun) {
+        log('Dry run — no files were changed.');
+        return;
+    }
+    if (!options.yes && !(await confirm('Apply these updates?'))) {
+        log('Cancelled.');
+        return;
+    }
+
+    const write = ({ file, content, isNew }: PendingChange) => {
+        const targetPath = path.join(cwd, file.path);
+        fs.mkdirSync(path.dirname(targetPath), { recursive: true });
+        fs.writeFileSync(targetPath, content);
+        ok(`${isNew ? 'Created' : 'Updated'}: ${file.path}`);
+    };
+
+    const deps = new Set<string>();
+    for (const [name, changes] of plan) {
+        registry.components[name].dependencies.forEach((d) => deps.add(d));
+        changes.forEach(write);
+        addToComponentIndex(changes.map((x) => x.file), cwd);
+    }
+    if (coreChanges.length > 0 && registry.core) {
+        registry.core.dependencies.forEach((d) => deps.add(d));
+        coreChanges.forEach(write);
+    }
+    if (deps.size > 0) installNpmPackages([...deps], cwd);
+
+    console.log('');
+    ok(`${c.bold}Updated ${plan.size} component(s) to the latest version.${c.reset}`);
+};
+
 // ─── Help texts ───────────────────────────────────────────────────────────────
 
 const HELP_MAIN = `
@@ -845,7 +942,7 @@ ${c.bold}USAGE${c.reset}
 ${c.bold}COMMANDS${c.reset}
   ${c.green}init${c.reset}                       Initialize project: install deps, copy core files, patch entry
   ${c.green}add${c.reset} ${c.dim}<name...>${c.reset}             Add component(s) to your project
-  ${c.green}update${c.reset} ${c.dim}<name...>${c.reset}          Update component(s) to latest registry version
+  ${c.green}update${c.reset} ${c.dim}[name...]${c.reset}          Update component(s); no name = update ALL installed components
   ${c.green}diff${c.reset} ${c.dim}<name...>${c.reset}            Show diff between local and registry version
   ${c.green}remove${c.reset} ${c.dim}<name...>${c.reset}          Remove component(s) from your project
   ${c.green}list${c.reset}                       List all available components
@@ -854,6 +951,9 @@ ${c.bold}COMMANDS${c.reset}
 ${c.bold}OPTIONS${c.reset}
   ${c.cyan}--force${c.reset}                    Overwrite existing files when adding/updating
   ${c.cyan}--local${c.reset}                    Use local registry.json instead of remote
+  ${c.cyan}--yes${c.reset}                      Skip confirmation prompt (update)
+  ${c.cyan}--dry-run${c.reset}                  Preview updates without writing files (update)
+  ${c.cyan}--core${c.reset}                     Also update core files: cn.ts, themes, ThemeProvider, index.css (update)
   ${c.cyan}--help, -h${c.reset}                 Show help (use with a command for detailed help)
   ${c.cyan}--version, -v${c.reset}              Show version
 
@@ -867,7 +967,7 @@ ${c.bold}EXAMPLES${c.reset}
   ${c.dim}$${c.reset} npx basuicn diff button           ${c.dim}# See what changed since last update${c.reset}
   ${c.dim}$${c.reset} npx basuicn doctor                ${c.dim}# Diagnose missing deps/config${c.reset}
 
-${c.dim}Documentation: https://github.com/Basuicn/basuicn-core${c.reset}
+${c.dim}Documentation: https://github.com/huytq203/core-basuicn${c.reset}
 `;
 
 const HELP_COMMANDS: Record<string, string> = {
@@ -918,14 +1018,24 @@ ${c.bold}basuicn add${c.reset} ${c.dim}<name...>${c.reset}
     ${c.dim}$${c.reset} npx basuicn add           ${c.dim}# Prompts to select components${c.reset}
 `,
     update: `
-${c.bold}basuicn update${c.reset} ${c.dim}<name...>${c.reset}
+${c.bold}basuicn update${c.reset} ${c.dim}[name...]${c.reset}
 
   Update component(s) to the latest registry version.
-  Equivalent to ${c.cyan}add --force${c.reset}.
+
+  ${c.bold}Without names${c.reset} it scans your project, finds every installed
+  component, lists the ones that changed upstream, and updates them after confirmation.
+  With names it behaves like ${c.cyan}add --force${c.reset}.
+
+  ${c.bold}Options:${c.reset}
+    ${c.cyan}--yes${c.reset}        Skip the confirmation prompt
+    ${c.cyan}--dry-run${c.reset}    Show what would change, write nothing
+    ${c.cyan}--core${c.reset}       Also update core files (overwrites index.css / theme customizations)
 
   ${c.bold}Usage:${c.reset}
-    ${c.dim}$${c.reset} npx basuicn update button
-    ${c.dim}$${c.reset} npx basuicn update button card dialog
+    ${c.dim}$${c.reset} npx basuicn update                ${c.dim}# update all installed components${c.reset}
+    ${c.dim}$${c.reset} npx basuicn update --dry-run      ${c.dim}# preview only${c.reset}
+    ${c.dim}$${c.reset} npx basuicn update --yes --core   ${c.dim}# everything, no prompt${c.reset}
+    ${c.dim}$${c.reset} npx basuicn update button card    ${c.dim}# specific components${c.reset}
 `,
     remove: `
 ${c.bold}basuicn remove${c.reset} ${c.dim}<name...>${c.reset}
@@ -1089,8 +1199,11 @@ const main = async () => {
 
         case 'update': {
             if (componentNames.length === 0) {
-                error(`Usage: ${c.cyan}npx basuicn update <component-name> [...]${c.reset}`);
-                console.log(`  Run ${c.cyan}npx basuicn update --help${c.reset} for details.`);
+                await updateAllComponents(registry, cwd, {
+                    yes: args.includes('--yes'),
+                    dryRun: args.includes('--dry-run'),
+                    includeCore: args.includes('--core'),
+                });
                 return;
             }
             const updateFramework = detectFramework(cwd);

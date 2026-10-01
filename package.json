@@ -1,13 +1,13 @@
 {
   "name": "basuicn",
   "private": false,
-  "version": "0.3.19",
+  "version": "0.4.0",
   "type": "module",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Basuicn/basuicn-core.git"
+    "url": "https://github.com/huytq203/core-basuicn.git"
   },
-  "homepage": "https://github.com/Basuicn/basuicn-core#readme",
+  "homepage": "https://github.com/huytq203/core-basuicn#readme",
   "bin": {
     "basuicn": "./dist/ui-cli.cjs"
   },
@@ -18,7 +18,6 @@
     "README_CLI.md"
   ],
   "scripts": {
-    "setup-hooks": "git config core.hooksPath .githooks",
     "version:set": "node scripts/set-version.mjs",
     "dev": "vite",
     "build": "tsc -b && vite build",

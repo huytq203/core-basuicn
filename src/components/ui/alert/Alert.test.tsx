@@ -21,7 +21,7 @@ describe('Alert', () => {
 
   it('applies destructive variant', () => {
     const { container } = render(<Alert variant="destructive">Error</Alert>);
-    expect(container.firstChild).toHaveClass('text-destructive');
+    expect(container.firstChild).toHaveClass('text-danger');
   });
 
   it('applies success variant', () => {

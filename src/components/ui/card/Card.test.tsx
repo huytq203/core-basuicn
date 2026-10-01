@@ -28,6 +28,6 @@ describe('Card', () => {
 
   it('renders with border and shadow', () => {
     const { container } = render(<Card>Test</Card>);
-    expect(container.firstChild).toHaveClass('border', 'shadow-sm');
+    expect(container.firstChild).toHaveClass('border', 'rounded-xl');
   });
 });

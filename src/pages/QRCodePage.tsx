@@ -3,7 +3,7 @@ import { PageHeader, ShowcaseCard } from "@/components/ui/Showcase";
 import { QRCode, type QRCodeLevel } from "@components/ui/qrcode/QRCode";
 
 const DEMO_URL = "https://basuicn.dev";
-const GITHUB_URL = "https://github.com/Basuicn/basuicn-core";
+const GITHUB_URL = "https://github.com/huytq203/core-basuicn";
 
 const SIZES = [
   { size: "sm", label: "sm — 96px" },

@@ -130,6 +130,7 @@ export const SidebarMenuButton = React.forwardRef<HTMLButtonElement, SidebarMenu
         data-sidebar="menu-button"
         data-active={isActive}
         data-size={size}
+        aria-label={isCollapsed ? tooltip : undefined}
         className={menuButtonVariants({ size, collapsed: isCollapsed, className })}
         {...props}
       >

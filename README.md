@@ -201,10 +201,7 @@ npm run theme:sync
 # Build CLI binary
 npm run build:cli
 
-# Kích hoạt auto version bump sau mỗi commit
-npm run setup-hooks
-
-# Đặt version thủ công
+# Đặt version thủ công (không còn tự bump khi commit)
 npm run version:set 1.0.0       # Set thẳng
 npm run version:set major        # 0.x.x → 1.0.0
 npm run version:set minor        # x.2.x → x.3.0
