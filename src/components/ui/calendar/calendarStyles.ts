@@ -5,7 +5,7 @@ import type { CalendarSize } from './calendarUtils';
 /** Cell classes for the month / year pick grids. */
 export const gridCellVariants = tv({
   base: [
-    'h-11 min-w-0 rounded-lg text-sm font-medium tabular-nums text-foreground transition-colors',
+    'h-11 min-w-0 whitespace-nowrap rounded-lg px-2 text-sm font-medium tabular-nums text-foreground transition-colors',
     'hover:bg-primary/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
     'disabled:pointer-events-none disabled:opacity-40',
   ],
@@ -34,6 +34,13 @@ const cellSize: Record<CalendarSize, { cell: string; text: string }> = {
   sm: { cell: 'size-8', text: 'text-xs' },
   md: { cell: 'size-10', text: 'text-sm' },
   lg: { cell: 'size-12', text: 'text-base' },
+};
+
+/** Fixed panel width (7 day cells) so month/year grids keep the same footprint as the day grid. */
+export const panelWidth: Record<CalendarSize, string> = {
+  sm: 'w-56',
+  md: 'w-70',
+  lg: 'w-84',
 };
 
 const rangeBand = 'bg-primary/10';

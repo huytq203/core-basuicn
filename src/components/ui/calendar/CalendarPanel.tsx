@@ -2,7 +2,7 @@ import * as React from 'react';
 import type { DayPickerProps } from 'react-day-picker';
 import { ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { MonthGrid, YearGrid } from './CalendarGrids';
-import { getDayClassNames, headerButtonVariants } from './calendarStyles';
+import { getDayClassNames, headerButtonVariants, panelWidth } from './calendarStyles';
 import {
   clampYear,
   getIntlTag,
@@ -71,6 +71,7 @@ const CalendarPanel = React.forwardRef<HTMLDivElement, CalendarPanelProps>(
 
     return (
       <div ref={ref} className={className ?? 'p-3.5'} data-calendar-view={view}>
+        <div className={panelWidth[size]}>
         <div className="mb-2.5 flex items-center gap-1">
           <button type="button" aria-label={prevLabel} disabled={!canMove(-1)} onClick={() => move(-1)} className={headerButtonVariants({ kind: 'icon' })}>
             <ChevronLeft className="size-4" aria-hidden="true" />
@@ -126,6 +127,7 @@ const CalendarPanel = React.forwardRef<HTMLDivElement, CalendarPanelProps>(
             onPick={(y) => { onMonthChange(new Date(clampYear(y, fromYear, toYear), month.getMonth(), 1)); setView('month'); }}
           />
         )}
+        </div>
       </div>
     );
   },

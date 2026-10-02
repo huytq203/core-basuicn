@@ -6,7 +6,7 @@ import readline from 'readline';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const VERSION = '0.4.0';
+const VERSION = '0.5.0';
 const REGISTRY_LOCAL = './registry.json';
 const REGISTRY_REMOTE = 'https://raw.githubusercontent.com/huytq203/core-basuicn/main/registry.json';
 
